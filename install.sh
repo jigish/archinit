@@ -116,6 +116,7 @@ echo
 echo "installing base packages"
 pacstrap -K /mnt base linux linux-firmware \
 	${CPU_MANUFACTURER}-ucode \
+	mkinitcpio \
 	btrfs-progs \
 	sof-firmware \
 	man-db man-pages texinfo \
