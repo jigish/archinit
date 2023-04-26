@@ -36,7 +36,6 @@ echo "setting up user '${NEW_USER}'"
 cat <<EOF >/etc/doas.conf
 permit nopass setenv { XAUTHORITY LANG LC_ALL } :wheel
 EOF
-ln -s $(which doas) /usr/bin/sudo
 useradd -m -G wheel -s ${USER_SHELL} ${NEW_USER}
 echo
 cat /etc/sudoers |grep wheel
