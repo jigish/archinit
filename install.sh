@@ -119,7 +119,7 @@ pacstrap -K /mnt base linux linux-firmware \
 	btrfs-progs \
 	sof-firmware \
 	man-db man-pages texinfo \
-	openssh sudo zsh
+	openssh opendoas zsh
 echo
 
 echo "generating fstab"
