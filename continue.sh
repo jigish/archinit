@@ -38,8 +38,6 @@ permit nopass setenv { XAUTHORITY LANG LC_ALL } :wheel
 EOF
 useradd -m -G wheel -s ${USER_SHELL} ${NEW_USER}
 echo
-cat /etc/sudoers |grep wheel
-echo
 echo "please create the password for '${NEW_USER}'"
 passwd jigish
 echo
