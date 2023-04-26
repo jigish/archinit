@@ -33,7 +33,10 @@ systemctl enable systemd-resolved.service
 echo
 
 echo "setting up user '${NEW_USER}'"
-sed -i -e 's/^.*%wheel \(.*\)NOPASSWD\(.*\)$/%wheel \1NOPASSWD\2/g' /etc/sudoers
+cat <<EOF >/etc/doas.conf
+permit nopass setenv { XAUTHORITY LANG LC_ALL } :wheel
+EOF
+ln -s $(which doas) /usr/bin/sudo
 useradd -m -G wheel -s ${USER_SHELL} ${NEW_USER}
 echo
 cat /etc/sudoers |grep wheel
