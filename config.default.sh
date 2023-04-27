@@ -13,7 +13,7 @@ export RAM_SIZE_GB=1
 export CPU_MANUFACTURER=intel
 
 # hostname
-export NEW_HOSTNAME=arch-sway-init-test
+export NEW_HOSTNAME=arch-init-test
 
 # user
 export NEW_USER=jigish
