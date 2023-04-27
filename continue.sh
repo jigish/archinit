@@ -32,22 +32,8 @@ systemctl enable systemd-networkd.service
 systemctl enable systemd-resolved.service
 echo
 
-echo "setting up user '${NEW_USER}'"
-cat <<EOF >/etc/doas.conf
-permit nopass setenv { XAUTHORITY LANG LC_ALL } :wheel
-EOF
-useradd -m -G wheel -s ${USER_SHELL} ${NEW_USER}
-echo
-echo "please create the password for '${NEW_USER}'"
-passwd jigish
-echo
-
 echo "initramfs"
 mkinitcpio -P
-echo
-
-echo "please create the root password"
-passwd
 echo
 
 echo "setting up systemd-boot"
@@ -55,6 +41,21 @@ bootctl --path=/boot install
 cp ${SCRIPTDIR}/loader.conf /boot/loader/loader.conf
 cp ${SCRIPTDIR}/arch.conf /boot/loader/entries/arch.conf
 sed -i -e "s/__CPU_MANUFACTURER__/${CPU_MANUFACTURER}/g" /boot/loader/entries/arch.conf
+echo
+
+echo "setting up user '${NEW_USER}'"
+cat <<EOF >/etc/doas.conf
+permit nopass setenv { XAUTHORITY LANG LC_ALL } :wheel
+EOF
+useradd -m -G wheel -s ${USER_SHELL} ${NEW_USER}
+echo
+
+echo "please create the password for '${NEW_USER}'"
+passwd ${NEW_USER}
+echo
+
+echo "locking root"
+passwd -l root
 echo
 
 echo "exiting chroot"
