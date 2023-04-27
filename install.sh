@@ -108,7 +108,16 @@ echo "partitions and filesystem created"
 echo
 lsblk
 fdisk -l
-sleep 5
+if [[ -z ${NO_INTERACTION} ]]; then
+	echo
+	echo "please check partitions above"
+	echo "press q to exit or anything else to continue"
+	read -n 1 r
+	if [[ "$r" = "q" ]]; then
+		echo "exiting"
+		exit 0
+	fi
+fi
 echo
 
 # assume mirror servers are correct
@@ -127,7 +136,16 @@ echo "generating fstab"
 genfstab -U /mnt >> /mnt/etc/fstab
 echo
 cat /mnt/etc/fstab
-sleep 5
+if [[ -z ${NO_INTERACTION} ]]; then
+	echo
+	echo "please check fstab above"
+	echo "press q to exit or anything else to continue"
+	read -n 1 r
+	if [[ "$r" = "q" ]]; then
+		echo "exiting"
+		exit 0
+	fi
+fi
 echo
 
 echo "copying these scripts to /mnt/${SCRIPTDIR} so they are in the chroot"

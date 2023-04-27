@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# set to not wait for keypress after partitioning / fstab creation
+export NO_INTERACTION=
+
 # The device to install to
 export INSTALL_DEV=/dev/sda
 
