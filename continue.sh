@@ -72,7 +72,6 @@ timeout      3
 console-mode max
 editor       no
 EOF
-ARCH_OS_UUID=$(blkid ${INSTALL_DEV}3 | awk -F '"' '{print $2}')
 cat >/boot/loader/entries/arch.conf <<EOF
 title   Arch Linux
 linux   /vmlinuz-linux
@@ -83,7 +82,7 @@ EOF
 echo
 
 echo "setting up user '${NEW_USER}'"
-cat <<EOF >/etc/doas.conf
+cat >/etc/doas.conf <<EOF
 permit nopass setenv { XAUTHORITY LANG LC_ALL } :wheel
 EOF
 useradd -m -G wheel -s ${USER_SHELL} ${NEW_USER}
