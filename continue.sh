@@ -58,7 +58,7 @@ else
   cat >/etc/NetworkManager/dispatcher.d/09-timezone <<EOF
 #!/bin/sh
 case "$$2" in
-    up)
+    connectivity-change)
         timedatectl set-timezone "$$(curl --fail https://ipapi.co/timezone)"
     ;;
 esac
