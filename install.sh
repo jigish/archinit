@@ -35,7 +35,7 @@ echo "  -> EFI:         EFI partition (${EFI_PARTITION_SIZE_MB}MB)"
 echo "  -> cryptswap:   encrypted swap partition (${SWAP_PARTITION_SIZE_MB}MB)"
 echo "  -> cryptsystem: encrypted system partition (rest of the disk)"
 sgdisk --clear \
-  --new 1:0:+${EFI_PARTITION_SIZE_MB}MiB --typecode=1:ef00 --change-name=1:EFI \
+  --new 1:0:+${EFI_PARTITION_SIZE_MB}MiB  --typecode=1:ef00 --change-name=1:EFI \
   --new 2:0:+${SWAP_PARTITION_SIZE_MB}MiB --typecode=2:8200 --change-name=2:cryptswap \
   --new 3:0:0                             --typecode=3:8300 --change-name=3:cryptsystem \
   ${INSTALL_DEV}
