@@ -50,13 +50,25 @@ if [[ -z "${LAPTOP}" ]]; then
   cp ${SCRIPTDIR}/20-ethernet.network /etc/systemd/network/
   systemctl enable systemd-networkd.service
   systemctl enable systemd-resolved.service
-  echo
 else
   # use NetworkManager since laptops move around a lot. should have been installed via pacstrap.
   systemctl enable systemd-resolved.service
   systemctl enable NetworkManager.service
-  echo
+  # auto set timezone
+  cat >/etc/NetworkManager/dispatcher.d/09-timezone <<EOF
+#!/bin/sh
+case "$$2" in
+    up)
+        timedatectl set-timezone "$$(curl --fail https://ipapi.co/timezone)"
+    ;;
+esac
+EOF
 fi
+echo
+
+echo "enabling systemd-timesyncd.service"
+systemctl enable systemd-timesyncd.service
+echo
 
 echo "initramfs"
 sed -i 's/BINARIES=()/BINARIES=(btrfs)/' /etc/mkinitcpio.conf
