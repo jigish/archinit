@@ -22,25 +22,64 @@ echo "generating locale configs"
 sed -i -e 's/^.*en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/g' /etc/locale.gen
 locale-gen
 echo 'LANG=en_US.UTF-8' >/etc/locale.conf
-# no neeed to set up keyboard layout -- i always use qwerty/us
+echo 'KEYMAP=us' > /etc/vconsole.conf
 echo
 
-echo "settng up network"
-echo "${NEW_HOSTNAME}" >/etc/hostname
-cp ${SCRIPTDIR}/20-ethernet.network /etc/systemd/network/
-systemctl enable systemd-networkd.service
-systemctl enable systemd-resolved.service
+echo "installing packages"
+ADDITIONAL_PACKAGES=(
+  "${CPU_MANUFACTURER}-ucode"
+  "btrfs-progs"
+  "man-db"
+  "man-pages"
+  "opendoas"
+  "openssh"
+  "sof-firmware"
+  "texinfo"
+  "zsh"
+)
+if [[ -n "${LAPTOP}" ]]; then
+  ADDITIONAL_PACKAGES+=("networkmanager")
+fi
+pacman -Sy ${ADDITIONAL_PACKAGES[@]}
 echo
+
+echo "setting up network"
+if [[ -z "${LAPTOP}" ]]; then
+  # use systemd-networkd and systemd-resolved since we're a static ethernet connection
+  echo "${NEW_HOSTNAME}" >/etc/hostname
+  cp ${SCRIPTDIR}/20-ethernet.network /etc/systemd/network/
+  systemctl enable systemd-networkd.service
+  systemctl enable systemd-resolved.service
+  echo
+else
+  # use NetworkManager since laptops move around a lot. should have been installed via pacstrap.
+  systemctl enable systemd-resolved.service
+  systemctl enable NetworkManager.service
+  echo
+fi
 
 echo "initramfs"
+sed -i 's/BINARIES=()/BINARIES=(btrfs)/' /etc/mkinitcpio.conf
+sed -i 's/^HOOKS=.*/HOOKS=(base systemd autodetect modconf kms keyboard sd-vconsole block filesystems btrfs sd-encrypt fsck)/' /etc/mkinitcpio.conf
 mkinitcpio -P
 echo
 
 echo "setting up systemd-boot"
 bootctl --path=/boot install
-cp ${SCRIPTDIR}/loader.conf /boot/loader/loader.conf
-cp ${SCRIPTDIR}/arch.conf /boot/loader/entries/arch.conf
-sed -i -e "s/__CPU_MANUFACTURER__/${CPU_MANUFACTURER}/g" /boot/loader/entries/arch.conf
+cat >/boot/loader/loader.conf <<EOF
+default      arch.conf
+timeout      3
+console-mode max
+editor       no
+EOF
+ARCH_OS_UUID=$(blkid ${INSTALL_DEV}3 | awk -F '"' '{print $2}')
+cat >/boot/loader/entries/arch.conf <<EOF
+title   Arch Linux
+linux   /vmlinuz-linux
+initrd  /${CPU_MANUFACTURER}-ucode.img
+initrd  /initramfs-linux.img
+options root=LABEL=system rootflags=subvol=@ rd.luks.allow-discards rw
+EOF
 echo
 
 echo "setting up user '${NEW_USER}'"

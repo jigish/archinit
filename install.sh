@@ -28,80 +28,66 @@ echo "updating system clock"
 timedatectl
 echo
 
-# TODO dm_crypt
 echo "wiping ${INSTALL_DEV}"
-wipefs -a /dev/sda
+sgdisk --zap-all ${INSTALL_DEV}
 echo "partitioning ${INSTALL_DEV}"
-echo "creating boot partition (${BOOT_PARTITION_SIZE_MB}MB)"
-sed -e 's/^.*|//' << EOF | fdisk ${INSTALL_DEV}
-new empty GPT partition table       |g
-new partition                       |n
-partition number 1 (boot)           |1
-start at beginning of disk          |
-boot partition size                 |+${BOOT_PARTITION_SIZE_MB}M
-change partition type               |t
-type: EFI system                    |uefi
-print the in-memory partition table |p
-write the partition table and quit  |w
-EOF
-echo
-echo "creating swap partition (${SWAP_PARTITION_SIZE_MB}MB)"
-sed -e 's/^.*|//' << EOF | fdisk ${INSTALL_DEV}
-new partition                       |n
-partition number 2 (swap)           |2
-start after preceeding partition    |
-swap partition size                 |+${SWAP_PARTITION_SIZE_MB}M
-change partition type               |t
-choose partition 2                  |2
-type: Linux swap                    |swap
-print the in-memory partition table |p
-write the partition table and quit  |w
-EOF
-echo
-echo "creating arch partition (rest of the disk)"
-sed -e 's/^.*|//' << EOF | fdisk ${INSTALL_DEV}
-new partition                       |n
-partition number 3                  |3
-start after preceeding partition    |
-end at the end of the disk          |
-print the in-memory partition table |p
-write the partition table and quit  |w
-EOF
+echo "  -> EFI:         EFI partition (${EFI_PARTITION_SIZE_MB}MB)"
+echo "  -> cryptswap:   encrypted swap partition (${SWAP_PARTITION_SIZE_MB}MB)"
+echo "  -> cryptsystem: encrypted system partition (rest of the disk)"
+sgdisk --clear \
+  --new 1:0:+${EFI_PARTITION_SIZE_MB}MiB --typecode=1:ef00 --change-name=1:EFI \
+  --new 2:0:+${SWAP_PARTITION_SIZE_MB}MiB --typecode=2:8200 --change-name=2:cryptswap \
+  --new 3:0:0                             --typecode=3:8300 --change-name=3:cryptsystem \
+  ${INSTALL_DEV}
+echo "waiting 5 seconds"
+sleep 5
 echo
 
-echo "formatting ${INSTALL_DEV}1 (fat32)"
-mkfs.fat -F 32 ${INSTALL_DEV}1
-echo
-echo "formatting ${INSTALL_DEV}2 (swap)"
-mkswap ${INSTALL_DEV}2
-echo
-echo "formatting ${INSTALL_DEV}3 (btrfs)"
-mkfs.btrfs -L arch-os ${INSTALL_DEV}3
+echo "encrypting root partition"
+cryptsetup luksFormat /dev/disk/by-partlabel/cryptsystem
+cryptsetup open /dev/disk/by-partlabel/cryptsystem system
 echo
 
-echo "mounting ${INSTALL_DEV}3 and creating btrfs subvolumes"
-mount /dev/sda3 /mnt
+echo "encrypting swap partition"
+cryptsetup open --type plain --key-file /dev/urandom /dev/disk/by-partlabel/cryptswap swap
+echo
+
+echo "formatting EFI partition (fat32)"
+mkfs.fat -F 32 -n EFI /dev/disk/by-partlabel/EFI
+echo
+echo "formatting swap partition"
+mkswap -L swap /dev/mapper/swap
+echo
+echo "formatting system partition (btrfs)"
+mkfs.btrfs --label system /dev/mapper/system
+echo
+
+echo "mounting system partition and creating btrfs subvolumes"
+mount -t btrfs LABEL=system /mnt
 btrfs su cr /mnt/@
 btrfs su cr /mnt/@home
+btrfs su cr /mnt/@pkg
 btrfs su cr /mnt/@snapshots
 echo
 
-echo "unmounting ${INSTALL_DEV}3 and mounting subvolumes"
+echo "unmounting system partition and mounting subvolumes"
 umount /mnt
-mount -o defaults,noatime,compress=zstd,ssd,subvol=@ ${INSTALL_DEV}3 /mnt
+mount -t btrfs -o defaults,noatime,compress=zstd,ssd,subvol=@ LABEL=system /mnt
 mkdir /mnt/home
-mount -o defaults,noatime,compress=zstd,ssd,subvol=@home ${INSTALL_DEV}3 /mnt/home
+mount -t btrfs -o defaults,noatime,compress=zstd,ssd,subvol=@home LABEL=system /mnt/home
+mkdir -p /mnt/var/cache/pacman/pkg
+mount -t btrfs -o defaults,noatime,compress=zstd,ssd,subvol=@pkg LABEL=system /mnt/var/cache/pacman/pkg
 mkdir /mnt/.snapshots
-mount -o defaults,noatime,compress=zstd,ssd,subvol=@snapshots ${INSTALL_DEV}3 /mnt/.snapshots
+mount -t btrfs -o defaults,noatime,compress=zstd,ssd,subvol=@snapshots LABEL=system /mnt/.snapshots
 echo
 
-echo "mounting ${INSTALL_DEV}1 (boot)"
-mkdir /mnt/boot
-mount ${INSTALL_DEV}1 /mnt/boot
+echo "mounting EFI partition"
+mkdir -p /mnt/boot
+mount LABEL=EFI /mnt/boot
 echo
 
-echo "mounting ${INSTALL_DEV}2 (swap)"
-swapon ${INSTALL_DEV}2
+echo "mounting swap partition"
+swapon -L swap
 echo
 
 echo "partitions and filesystem created"
@@ -123,19 +109,21 @@ echo
 # assume mirror servers are correct
 
 echo "installing base packages"
-pacstrap -K /mnt base linux linux-firmware \
-	${CPU_MANUFACTURER}-ucode \
-	mkinitcpio \
-	btrfs-progs \
-	sof-firmware \
-	man-db man-pages texinfo \
-	openssh opendoas zsh
+pacstrap -K /mnt base linux linux-firmware mkinitcpio
 echo
 
-echo "generating fstab"
-genfstab -U /mnt >> /mnt/etc/fstab
+echo "creating crypttab"
+echo
+
+echo "generating fstab and crypttab"
+genfstab -L -p /mnt >> /mnt/etc/fstab
+sed -i 's#LABEL=swap#/dev/mapper/swap#g' /mnt/etc/fstab
+echo "swap /dev/disk/by-partlabel/cryptswap /dev/urandom swap,cipher=aes-cbc-essiv:sha256,size=256" >> /mnt/etc/crypttab
+echo "system /dev/disk/by-partlabel/cryptsystem none timeout=180" >>/mnt/etc/crypttab.initramfs # tpm2-device=auto for tpm2
 echo
 cat /mnt/etc/fstab
+cat /mnt/etc/crypttab
+cat /mnt/etc/crypttab.initramfs
 if [[ -z ${NO_INTERACTION} ]]; then
 	echo
 	echo "please check fstab above"
@@ -164,15 +152,5 @@ echo "unmounting /mnt"
 umount -R /mnt
 echo
 
-echo "rebooting in 5s..."
-sleep 1
-echo "             4s..."
-sleep 1
-echo "             3s..."
-sleep 1
-echo "             2s..."
-sleep 1
-echo "             1s..."
-sleep 1
-echo "rebooting now. good luck."
-reboot
+echo
+echo "reboot to continue. good luck."
