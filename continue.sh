@@ -44,9 +44,9 @@ pacman -Sy ${ADDITIONAL_PACKAGES[@]}
 echo
 
 echo "setting up network"
+echo "${NEW_HOSTNAME}" >/etc/hostname
 if [[ -z "${LAPTOP}" ]]; then
   # use systemd-networkd and systemd-resolved since we're a static ethernet connection
-  echo "${NEW_HOSTNAME}" >/etc/hostname
   cp ${SCRIPTDIR}/20-ethernet.network /etc/systemd/network/
   systemctl enable systemd-networkd.service
   systemctl enable systemd-resolved.service
