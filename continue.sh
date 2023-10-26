@@ -72,7 +72,7 @@ echo
 
 echo "initramfs"
 sed -i 's/BINARIES=()/BINARIES=(btrfs)/' /etc/mkinitcpio.conf
-sed -i 's/^HOOKS=.*/HOOKS=(base systemd autodetect modconf kms keyboard sd-vconsole block filesystems btrfs sd-encrypt fsck)/' /etc/mkinitcpio.conf
+sed -i 's/^HOOKS=.*/HOOKS=(base systemd autodetect modconf kms keyboard sd-vconsole block filesystems btrfs sd-encrypt encrypt fsck)/' /etc/mkinitcpio.conf
 mkinitcpio -P
 echo
 
